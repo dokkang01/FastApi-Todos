@@ -5,28 +5,193 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>To-Do List</title>
     <style>
-        body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
-        form { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-        input[type="text"] { flex: 1 1 12rem; padding: .5rem; }
-        ul { list-style: none; padding: 0; }
-        li { display: flex; align-items: center; gap: .5rem; padding: .4rem 0; border-bottom: 1px solid #e5e5e5; }
-        li span { flex: 1; }
-        .done { text-decoration: line-through; color: #888; }
-        #error { color: #b00020; }
+        :root {
+            --bg: #1e1e1e;
+            --card: #202020;
+            --input-bg: #2a2a2a;
+            --text: #dcddde;
+            --text-muted: #8e8e8e;
+            --border: #333333;
+            --hover: rgba(255, 255, 255, 0.06);
+            --accent: #8875ff;
+            --danger: #e06c75;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+                "Noto Sans KR", Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 3rem 1rem;
+        }
+        .card {
+            max-width: 640px;
+            margin: 0 auto;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 2rem 2.25rem;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+        h1 {
+            display: flex;
+            align-items: center;
+            font-size: 1.9rem;
+            font-weight: 700;
+            margin: 0 0 1.5rem;
+        }
+        h1::before {
+            content: "◆";
+            color: var(--accent);
+            margin-right: .55rem;
+            font-size: 1.3rem;
+        }
+        form#todo-form { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+        input[type="text"] {
+            flex: 1 1 12rem;
+            padding: .55rem .75rem;
+            font-size: .95rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--text);
+            outline: none;
+            transition: border-color .15s, box-shadow .15s;
+        }
+        input[type="text"]::placeholder { color: var(--text-muted); }
+        input[type="text"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(136, 117, 255, 0.2);
+        }
+        button {
+            font-size: .9rem;
+            font-family: inherit;
+            border: none;
+            border-radius: 6px;
+            padding: .55rem .9rem;
+            cursor: pointer;
+            transition: background .15s, opacity .15s, border-color .15s;
+        }
+        form#todo-form button[type="submit"] {
+            background: var(--accent);
+            color: #fff;
+            font-weight: 500;
+        }
+        form#todo-form button[type="submit"]:hover { background: #9c8bff; }
+        ul { list-style: none; padding: 0; margin: 0; }
+        li {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            padding: .55rem .5rem;
+            border-radius: 6px;
+            transition: background .12s;
+        }
+        li:hover { background: var(--hover); }
+        li span { flex: 1; font-size: .95rem; }
+        li input[type="checkbox"] {
+            width: 17px;
+            height: 17px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+        li .actions { display: flex; gap: .3rem; opacity: 0; transition: opacity .12s; }
+        li:hover .actions { opacity: 1; }
+        li .actions button {
+            background: transparent;
+            color: var(--text-muted);
+            padding: .3rem .55rem;
+            font-size: .8rem;
+        }
+        li .actions button:hover { background: var(--border); color: var(--text); }
+        li .actions button.delete:hover { color: var(--danger); }
+        .done { text-decoration: line-through; color: var(--text-muted); }
+        #error {
+            color: var(--danger);
+            background: rgba(224, 108, 117, 0.12);
+            border-radius: 6px;
+            padding: .5rem .75rem;
+            font-size: .9rem;
+            margin: 0 0 1rem;
+        }
+        dialog {
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem 1.75rem;
+            width: min(420px, 90vw);
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+        }
+        dialog::backdrop {
+            background: rgba(0, 0, 0, 0.6);
+        }
+        dialog h2 { margin: 0 0 .25rem; font-size: 1.05rem; font-weight: 600; }
+        dialog p { margin: .25rem 0 0; font-size: .85rem; color: var(--text-muted); }
+        dialog label {
+            display: block;
+            font-size: .78rem;
+            color: var(--text-muted);
+            margin: 1rem 0 .35rem;
+        }
+        dialog input[type="text"] { width: 100%; }
+        .dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1.5rem; }
+        .dialog-actions button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .dialog-actions button.secondary:hover { background: var(--hover); }
+        .dialog-actions button.primary { background: var(--accent); color: #fff; }
+        .dialog-actions button.primary:hover { background: #9c8bff; }
+        .dialog-actions button.danger { background: var(--danger); color: #fff; }
+        .dialog-actions button.danger:hover { background: #e88088; }
     </style>
 </head>
 <body>
-    <h1>To-Do List</h1>
-    <form id="todo-form">
-        <input type="text" id="title" placeholder="제목 (예: 20231234)" required>
-        <input type="text" id="description" placeholder="설명 (예: 홍길동)">
-        <button type="submit">Add To-Do</button>
-    </form>
-    <p id="error" role="alert" hidden></p>
-    <ul id="todo-list"></ul>
+    <div class="card">
+        <h1>To-Do List</h1>
+        <form id="todo-form">
+            <input type="text" id="title" placeholder="제목 (예: 20231234)" required>
+            <input type="text" id="description" placeholder="설명 (예: 홍길동)">
+            <button type="submit">Add To-Do</button>
+        </form>
+        <p id="error" role="alert" hidden></p>
+        <ul id="todo-list"></ul>
+    </div>
+
+    <dialog id="edit-dialog">
+        <form id="edit-form">
+            <h2>To-Do 수정</h2>
+            <label for="edit-title">제목</label>
+            <input type="text" id="edit-title" required>
+            <label for="edit-description">설명</label>
+            <input type="text" id="edit-description">
+            <div class="dialog-actions">
+                <button type="button" class="secondary" id="edit-cancel">취소</button>
+                <button type="submit" class="primary">저장</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="confirm-dialog">
+        <h2>정말 삭제할까요?</h2>
+        <p>이 작업은 되돌릴 수 없습니다.</p>
+        <div class="dialog-actions">
+            <button type="button" class="secondary" id="confirm-cancel">취소</button>
+            <button type="button" class="danger" id="confirm-ok">삭제</button>
+        </div>
+    </dialog>
+
     <script>
         const $ = (id) => document.getElementById(id);
         const listEl = $("todo-list"), errorEl = $("error");
+        const editDialog = $("edit-dialog"), editForm = $("edit-form");
+        const confirmDialog = $("confirm-dialog");
+
+        // 다이얼로그 바깥(backdrop)을 클릭하면 닫는다
+        for (const dialog of [editDialog, confirmDialog]) {
+          dialog.addEventListener("click", (event) => {
+            if (event.target === dialog) dialog.close();
+          });
+        }
 
         // 모든 요청을 한 곳에서 처리하고, 실패는 조용히 넘기지 않는다
         async function api(url, method = "GET", body) {
@@ -51,8 +216,8 @@
         const load = () => run("목록 불러오기", async () => render(await api("/todos")));
         const save = (id, todo) => run("수정", async () => { await api(`/todos/${id}`, "PUT", todo); await load(); });
 
-        function button(label, onclick) {
-          return Object.assign(document.createElement("button"), { textContent: label, onclick });
+        function button(label, onclick, className = "") {
+          return Object.assign(document.createElement("button"), { textContent: label, onclick, className });
         }
 
         function render(todos) {
@@ -66,24 +231,46 @@
               textContent: `${todo.title} — ${todo.description}`,
               className: todo.completed ? "done" : "",
             });
+            const actions = Object.assign(document.createElement("div"), { className: "actions" });
+            actions.append(button("Edit", () => edit(todo)), button("Delete", () => remove(todo.id), "delete"));
             const li = document.createElement("li");
-            li.append(check, text, button("Edit", () => edit(todo)), button("Delete", () => remove(todo.id)));
+            li.append(check, text, actions);
             return li;
           }));
         }
 
+        let editTarget = null;
+
         function edit(todo) {
-          const title = prompt("새 제목:", todo.title);
-          if (title === null) return;
-          const description = prompt("새 설명:", todo.description);
-          if (description === null) return;
-          save(todo.id, { ...todo, title: title.trim(), description: description.trim() });
+          editTarget = todo;
+          $("edit-title").value = todo.title;
+          $("edit-description").value = todo.description;
+          editDialog.showModal();
         }
 
+        editForm.onsubmit = (event) => {
+          event.preventDefault();
+          const title = $("edit-title").value.trim();
+          const description = $("edit-description").value.trim();
+          editDialog.close();
+          save(editTarget.id, { ...editTarget, title, description });
+        };
+
+        $("edit-cancel").onclick = () => editDialog.close();
+
+        let pendingDeleteId = null;
+
         function remove(id) {
-          if (!confirm("정말 삭제할까요?")) return;
-          run("삭제", async () => { await api(`/todos/${id}`, "DELETE"); await load(); });
+          pendingDeleteId = id;
+          confirmDialog.showModal();
         }
+
+        $("confirm-cancel").onclick = () => confirmDialog.close();
+
+        $("confirm-ok").onclick = () => {
+          confirmDialog.close();
+          run("삭제", async () => { await api(`/todos/${pendingDeleteId}`, "DELETE"); await load(); });
+        };
 
         $("todo-form").onsubmit = (event) => {
           event.preventDefault();
