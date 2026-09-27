@@ -15,6 +15,8 @@
             --hover: rgba(255, 255, 255, 0.06);
             --accent: #8875ff;
             --danger: #e06c75;
+            --warn: #e5c07b;
+            color-scheme: dark;
         }
         * { box-sizing: border-box; }
         body {
@@ -48,7 +50,7 @@
             font-size: 1.3rem;
         }
         form#todo-form { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-        input[type="text"] {
+        input[type="text"], input[type="date"] {
             flex: 1 1 12rem;
             padding: .55rem .75rem;
             font-size: .95rem;
@@ -60,7 +62,8 @@
             transition: border-color .15s, box-shadow .15s;
         }
         input[type="text"]::placeholder { color: var(--text-muted); }
-        input[type="text"]:focus {
+        input[type="date"] { flex: 0 1 10rem; font-family: inherit; }
+        input[type="text"]:focus, input[type="date"]:focus {
             border-color: var(--accent);
             box-shadow: 0 0 0 3px rgba(136, 117, 255, 0.2);
         }
@@ -106,6 +109,17 @@
         }
         li .actions button:hover { background: var(--border); color: var(--text); }
         li .actions button.delete:hover { color: var(--danger); }
+        .due {
+            flex: none;
+            font-size: .75rem;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: .1rem .5rem;
+            white-space: nowrap;
+        }
+        .due.soon { color: var(--warn); border-color: var(--warn); }
+        .due.overdue { color: var(--danger); border-color: var(--danger); }
         .done { text-decoration: line-through; color: var(--text-muted); }
         #error {
             color: var(--danger);
@@ -135,7 +149,7 @@
             color: var(--text-muted);
             margin: 1rem 0 .35rem;
         }
-        dialog input[type="text"] { width: 100%; }
+        dialog input[type="text"], dialog input[type="date"] { width: 100%; }
         .dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1.5rem; }
         .dialog-actions button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
         .dialog-actions button.secondary:hover { background: var(--hover); }
@@ -151,6 +165,7 @@
         <form id="todo-form">
             <input type="text" id="title" placeholder="제목 (예: 20231234)" required>
             <input type="text" id="description" placeholder="설명 (예: 홍길동)">
+            <input type="date" id="due-date" title="마감일">
             <button type="submit">Add To-Do</button>
         </form>
         <p id="error" role="alert" hidden></p>
@@ -164,6 +179,8 @@
             <input type="text" id="edit-title" required>
             <label for="edit-description">설명</label>
             <input type="text" id="edit-description">
+            <label for="edit-due-date">마감일</label>
+            <input type="date" id="edit-due-date">
             <div class="dialog-actions">
                 <button type="button" class="secondary" id="edit-cancel">취소</button>
                 <button type="submit" class="primary">저장</button>
@@ -220,6 +237,20 @@
           return Object.assign(document.createElement("button"), { textContent: label, onclick, className });
         }
 
+        // 오늘 기준 남은 날짜로 "D-3", "D-Day", "2일 지남" 배지를 만든다
+        function dueBadge(todo) {
+          const now = new Date();
+          const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+          const days = Math.round((Date.parse(todo.due_date) - today) / 86400000);
+          const badge = Object.assign(document.createElement("span"), {
+            className: "due",
+            title: `마감일 ${todo.due_date}`,
+            textContent: days > 0 ? `D-${days}` : days === 0 ? "D-Day" : `${-days}일 지남`,
+          });
+          if (!todo.completed) badge.classList.toggle(days < 0 ? "overdue" : "soon", days <= 1);
+          return badge;
+        }
+
         function render(todos) {
           listEl.replaceChildren(...todos.map((todo) => {
             const check = Object.assign(document.createElement("input"), {
@@ -234,7 +265,9 @@
             const actions = Object.assign(document.createElement("div"), { className: "actions" });
             actions.append(button("Edit", () => edit(todo)), button("Delete", () => remove(todo.id), "delete"));
             const li = document.createElement("li");
-            li.append(check, text, actions);
+            li.append(check, text);
+            if (todo.due_date) li.append(dueBadge(todo));
+            li.append(actions);
             return li;
           }));
         }
@@ -245,6 +278,7 @@
           editTarget = todo;
           $("edit-title").value = todo.title;
           $("edit-description").value = todo.description;
+          $("edit-due-date").value = todo.due_date ?? "";
           editDialog.showModal();
         }
 
@@ -252,8 +286,9 @@
           event.preventDefault();
           const title = $("edit-title").value.trim();
           const description = $("edit-description").value.trim();
+          const due_date = $("edit-due-date").value || null;
           editDialog.close();
-          save(editTarget.id, { ...editTarget, title, description });
+          save(editTarget.id, { ...editTarget, title, description, due_date });
         };
 
         $("edit-cancel").onclick = () => editDialog.close();
@@ -275,7 +310,11 @@
         $("todo-form").onsubmit = (event) => {
           event.preventDefault();
           run("추가", async () => {
-            await api("/todos", "POST", { title: $("title").value.trim(), description: $("description").value.trim() });
+            await api("/todos", "POST", {
+              title: $("title").value.trim(),
+              description: $("description").value.trim(),
+              due_date: $("due-date").value || null,
+            });
             event.target.reset();
             await load();
           });
