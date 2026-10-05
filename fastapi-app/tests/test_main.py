@@ -64,3 +64,23 @@ def test_delete_todo():
 def test_delete_todo_not_found():
     response = client.delete("/todos/1")
     assert response.status_code == 404
+
+def test_get_todos_sorted_by_due_date():
+    save_todos([
+        TodoItem(id=1, title="마감 없음"),
+        TodoItem(id=2, title="늦은 마감", due_date="2026-12-01"),
+        TodoItem(id=3, title="빠른 마감", due_date="2026-10-01"),
+        TodoItem(id=4, title="같은 날 나중 등록", due_date="2026-10-01"),
+    ])
+    response = client.get("/todos?sort=due_date")
+    assert response.status_code == 200
+    assert [t["id"] for t in response.json()] == [3, 4, 2, 1]  # 빠른 순, 같은 날은 등록순, 마감 없음은 맨 뒤
+
+def test_get_todos_default_order_is_id():
+    save_todos([TodoItem(id=1, title="A", due_date="2026-12-01"), TodoItem(id=2, title="B", due_date="2026-10-01")])
+    response = client.get("/todos")
+    assert [t["id"] for t in response.json()] == [1, 2]       # sort 없으면 기존처럼 등록순
+
+def test_get_todos_invalid_sort():
+    response = client.get("/todos?sort=title")
+    assert response.status_code == 422

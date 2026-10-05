@@ -1,6 +1,7 @@
 import json
 from datetime import date
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -44,9 +45,12 @@ def find_index(todos: list[TodoItem], todo_id: int) -> int:
     raise HTTPException(404, "To-Do item not found")
 
 
-@app.get("/todos")                               # 목록 조회
-def get_todos() -> list[TodoItem]:
-    return load_todos()
+@app.get("/todos")                               # 목록 조회 — ?sort=due_date 면 마감일 빠른 순
+def get_todos(sort: Literal["id", "due_date"] = "id") -> list[TodoItem]:
+    todos = load_todos()
+    if sort == "due_date":                       # 마감일 없는 항목은 맨 뒤, 같은 날짜는 등록순
+        todos.sort(key=lambda t: (t.due_date is None, t.due_date or date.max, t.id))
+    return todos
 
 
 @app.post("/todos", status_code=201)             # 추가 — id 는 서버가 매긴다
