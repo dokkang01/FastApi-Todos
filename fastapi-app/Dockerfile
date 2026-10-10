@@ -8,19 +8,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # root가 아닌 실행 전용 사용자 생성
-RUN useradd --create-home --uid 10001 appuser \
- && mkdir /app && chown appuser:appuser /app
+RUN useradd --create-home --uid 10001 appuser
 
-# 작업 디렉토리 설정
+# 작업 디렉토리 설정 (root 소유 → appuser는 코드 파일을 바꾸거나 지울 수 없음)
 WORKDIR /app
 
 # 의존성 먼저 설치 (코드만 바뀌면 이 단계는 캐시 재사용 → 빌드가 빨라짐)
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# 실행에 필요한 파일만 복사 (앱이 todo.json을 수정할 수 있도록 소유자를 appuser로 지정)
-COPY --chown=appuser:appuser main.py todo.json ./
-COPY --chown=appuser:appuser templates/ ./templates/
+# 실행에 필요한 파일만 복사 (root 소유, appuser는 읽기만 가능)
+COPY main.py todo.json ./
+COPY templates/ ./templates/
+
+# 앱이 저장해야 하는 데이터 파일만 appuser에게 쓰기 권한을 준다
+RUN chown appuser:appuser todo.json
 
 # 이후 명령은 appuser 권한으로 실행
 USER appuser
