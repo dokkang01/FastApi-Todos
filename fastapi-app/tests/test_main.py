@@ -12,7 +12,7 @@ def setup_and_teardown(tmp_path, monkeypatch):
     # TODO_FILE 은 본인 main.py의 파일 경로 변수명에 맞게 수정 (Path 객체 그대로 넘김, str()로 감싸지 않음)
     monkeypatch.setattr(main, "TODO_FILE", tmp_path / "todo.json")
     save_todos([])  # 테스트 전 초기화
-    yield
+    return
     # 테스트 후 정리: tmp_path 와 monkeypatch 가 자동으로 원상 복구
 
 def test_get_todos_empty():

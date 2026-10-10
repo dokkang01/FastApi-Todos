@@ -62,7 +62,7 @@ def create_todo(payload: TodoIn) -> TodoItem:
     return todo
 
 
-@app.put("/todos/{todo_id}")                     # 수정
+@app.put("/todos/{todo_id}", responses={404: {"description": "해당 id의 To-Do 항목이 없음"}})  # 수정
 def update_todo(todo_id: int, payload: TodoIn) -> TodoItem:
     todos = load_todos()
     todo = TodoItem(id=todo_id, **payload.model_dump())
@@ -71,7 +71,8 @@ def update_todo(todo_id: int, payload: TodoIn) -> TodoItem:
     return todo
 
 
-@app.delete("/todos/{todo_id}", status_code=204)  # 삭제
+@app.delete("/todos/{todo_id}", status_code=204,
+            responses={404: {"description": "해당 id의 To-Do 항목이 없음"}})  # 삭제
 def delete_todo(todo_id: int) -> None:
     todos = load_todos()
     del todos[find_index(todos, todo_id)]
