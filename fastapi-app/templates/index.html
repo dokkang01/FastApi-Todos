@@ -121,7 +121,26 @@
         .due.soon { color: var(--warn); border-color: var(--warn); }
         .due.overdue { color: var(--danger); border-color: var(--danger); }
         .done { text-decoration: line-through; color: var(--text-muted); }
-        .toolbar { display: flex; justify-content: flex-end; margin-bottom: .5rem; }
+        .toolbar { display: flex; align-items: center; gap: 1rem; margin-bottom: .5rem; }
+        .progress { flex: 1; display: flex; align-items: center; gap: .65rem; }
+        .progress[hidden] { display: none; }
+        .progress-label { font-size: .8rem; color: var(--text-muted); white-space: nowrap; }
+        .progress-track {
+            flex: 1;
+            max-width: 220px;
+            height: 6px;
+            background: var(--input-bg);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0;
+            background: var(--accent);
+            border-radius: 999px;
+            transition: width .25s;
+        }
+        #sort { margin-left: auto; }
         select {
             font-size: .85rem;
             font-family: inherit;
@@ -181,6 +200,13 @@
         </form>
         <p id="error" role="alert" hidden></p>
         <div class="toolbar">
+            <div class="progress" id="progress" hidden>
+                <span class="progress-label" id="progress-label"></span>
+                <div class="progress-track" role="progressbar" id="progress-bar"
+                     aria-label="완료 진행률" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </div>
             <select id="sort" aria-label="정렬">
                 <option value="id">등록순</option>
                 <option value="due_date">마감일순</option>
@@ -270,7 +296,19 @@
           return badge;
         }
 
+        // 목록 위에 "3/7 완료 (43%)"와 진행 막대를 표시한다 (할 일이 없으면 숨김)
+        function renderProgress(todos) {
+          const total = todos.length;
+          const done = todos.filter((todo) => todo.completed).length;
+          const percent = total ? Math.round((done / total) * 100) : 0;
+          $("progress").hidden = total === 0;
+          $("progress-label").textContent = `${done}/${total} 완료 (${percent}%)`;
+          $("progress-fill").style.width = `${percent}%`;
+          $("progress-bar").setAttribute("aria-valuenow", percent);
+        }
+
         function render(todos) {
+          renderProgress(todos);
           listEl.replaceChildren(...todos.map((todo) => {
             const check = Object.assign(document.createElement("input"), {
               type: "checkbox",
