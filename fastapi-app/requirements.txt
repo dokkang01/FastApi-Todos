@@ -5,4 +5,5 @@ pytest>=9.0.3             # CVE-2025-71176(임시 디렉터리) 패치 버전
 pytest-cov>=7.1.0
 pytest-html>=4.2.0
 httpx2>=2.13.1            # FastAPI TestClient용 HTTP 클라이언트 (httpx는 deprecated)
-requests>=2.32.0          # 통합 테스트에서 배포 서버로 HTTP 요청
+prometheus-fastapi-instrumentator>=8.1.0   # ← 추가: Starlette 1.x 지원 버전 (7.x 이하는 설치 충돌)
+prometheus-client>=0.26.0                  # ← 추가
