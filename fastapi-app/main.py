@@ -19,7 +19,7 @@ if not TODO_FILE.exists():                       # 없으면 빈 목록으로 �
 app = FastAPI(title="To-Do List API")
 
 Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
-w
+
 
 
 class TodoIn(BaseModel):                         # 클라이언트가 보내는 데이터 (id 없음)
