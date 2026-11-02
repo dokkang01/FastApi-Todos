@@ -1,4 +1,5 @@
 import json
+import threading
 from datetime import date
 from pathlib import Path
 from typing import Literal
@@ -12,6 +13,7 @@ from pydantic import BaseModel, Field
 BASE_DIR = Path(__file__).resolve().parent       # main.py 가 있는 폴더
 TODO_FILE = BASE_DIR / "todo.json"
 INDEX_FILE = BASE_DIR / "templates" / "index.html"
+TODO_LOCK = threading.Lock()                     # 동시 요청이 todo.json 을 함께 읽고 쓰지 못하게 막는다
 
 if not TODO_FILE.exists():                       # 없으면 빈 목록으로 만들어 둔다
     TODO_FILE.write_text("[]", encoding="utf-8")
@@ -52,7 +54,8 @@ def find_index(todos: list[TodoItem], todo_id: int) -> int:
 
 @app.get("/todos")                               # 목록 조회 — ?sort=due_date 면 마감일 빠른 순
 def get_todos(sort: Literal["id", "due_date"] = "id") -> list[TodoItem]:
-    todos = load_todos()
+    with TODO_LOCK:
+        todos = load_todos()
     if sort == "due_date":                       # 마감일 없는 항목은 맨 뒤, 같은 날짜는 등록순
         todos.sort(key=lambda t: (t.due_date is None, t.due_date or date.max, t.id))
     return todos
@@ -60,28 +63,31 @@ def get_todos(sort: Literal["id", "due_date"] = "id") -> list[TodoItem]:
 
 @app.post("/todos", status_code=201)             # 추가 — id 는 서버가 매긴다
 def create_todo(payload: TodoIn) -> TodoItem:
-    todos = load_todos()
-    new_id = max((t.id for t in todos), default=0) + 1
-    todo = TodoItem(id=new_id, **payload.model_dump())
-    save_todos(todos + [todo])
+    with TODO_LOCK:                              # 읽기~저장 사이에 끼어들면 id 중복·파일 깨짐이 생긴다
+        todos = load_todos()
+        new_id = max((t.id for t in todos), default=0) + 1
+        todo = TodoItem(id=new_id, **payload.model_dump())
+        save_todos(todos + [todo])
     return todo
 
 
 @app.put("/todos/{todo_id}", responses={404: {"description": "해당 id의 To-Do 항목이 없음"}})  # 수정
 def update_todo(todo_id: int, payload: TodoIn) -> TodoItem:
-    todos = load_todos()
     todo = TodoItem(id=todo_id, **payload.model_dump())
-    todos[find_index(todos, todo_id)] = todo
-    save_todos(todos)
+    with TODO_LOCK:
+        todos = load_todos()
+        todos[find_index(todos, todo_id)] = todo
+        save_todos(todos)
     return todo
 
 
 @app.delete("/todos/{todo_id}", status_code=204,
             responses={404: {"description": "해당 id의 To-Do 항목이 없음"}})  # 삭제
 def delete_todo(todo_id: int) -> None:
-    todos = load_todos()
-    del todos[find_index(todos, todo_id)]
-    save_todos(todos)
+    with TODO_LOCK:
+        todos = load_todos()
+        del todos[find_index(todos, todo_id)]
+        save_todos(todos)
 
 
 @app.get("/", include_in_schema=False)           # 화면 서빙
