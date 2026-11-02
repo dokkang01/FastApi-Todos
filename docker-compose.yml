@@ -73,6 +73,20 @@ services:
       - ALL
     # ports 없음: Prometheus가 내부 네트워크(node-exporter:9100)로 수집하므로 외부 공개 불필요
 
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.60.6
+    container_name: cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    # ports 없음: Prometheus가 cadvisor:8080으로 내부 수집
+
 volumes:                                        # ← 최상위(0칸)로 이동
   sonarqube_data:
   sonarqube_extensions:
@@ -80,3 +94,4 @@ volumes:                                        # ← 최상위(0칸)로 이동
   sonarqube_temp:
   prometheus-data:
   grafana-data:
+  cadvisor-data:
