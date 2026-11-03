@@ -84,3 +84,40 @@ def test_get_todos_default_order_is_id():
 def test_get_todos_invalid_sort():
     response = client.get("/todos?sort=title")
     assert response.status_code == 422
+
+def test_get_todos_filter_by_status():
+    save_todos([TodoItem(id=1, title="A"), TodoItem(id=2, title="B", completed=True), TodoItem(id=3, title="C")])
+    assert [t["id"] for t in client.get("/todos?status=active").json()] == [1, 3]
+    assert [t["id"] for t in client.get("/todos?status=completed").json()] == [2]
+    assert [t["id"] for t in client.get("/todos?status=all").json()] == [1, 2, 3]
+
+def test_get_todos_search_title_and_description():
+    save_todos([
+        TodoItem(id=1, title="DevOps 과제", description=""),
+        TodoItem(id=2, title="장보기", description="devops 스터디 간식"),
+        TodoItem(id=3, title="운동", description="헬스장"),
+    ])
+    response = client.get("/todos", params={"q": "  DEVOPS "})
+    assert [t["id"] for t in response.json()] == [1, 2]       # 제목·설명 모두, 대소문자·앞뒤 공백 무시
+
+def test_get_todos_blank_search_returns_all():
+    save_todos([TodoItem(id=1, title="A"), TodoItem(id=2, title="B")])
+    assert len(client.get("/todos?q=").json()) == 2
+
+def test_get_todos_filter_search_and_sort_combined():
+    save_todos([
+        TodoItem(id=1, title="보고서 초안", due_date="2026-12-01"),
+        TodoItem(id=2, title="보고서 제출", due_date="2026-11-10"),
+        TodoItem(id=3, title="보고서 검토", completed=True, due_date="2026-11-05"),
+        TodoItem(id=4, title="회의", due_date="2026-11-01"),
+    ])
+    response = client.get("/todos?status=active&q=보고서&sort=due_date")
+    assert [t["id"] for t in response.json()] == [2, 1]
+
+def test_get_todos_invalid_status():
+    response = client.get("/todos?status=done")
+    assert response.status_code == 422
+
+def test_get_todos_search_too_long():
+    response = client.get("/todos", params={"q": "a" * 101})
+    assert response.status_code == 422

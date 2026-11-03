@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from prometheus_fastapi_instrumentator import Instrumentator  # ← 추가
 from pydantic import BaseModel, Field
@@ -53,9 +53,17 @@ def find_index(todos: list[TodoItem], todo_id: int) -> int:
 
 
 @app.get("/todos")                               # 목록 조회 — ?sort=due_date 면 마감일 빠른 순
-def get_todos(sort: Literal["id", "due_date"] = "id") -> list[TodoItem]:
+def get_todos(
+    sort: Literal["id", "due_date"] = "id",
+    status: Literal["all", "active", "completed"] = "all",   # active = 진행 중, completed = 완료
+    q: str = Query("", max_length=100),                       # 제목·설명 검색어 (대소문자 무시)
+) -> list[TodoItem]:
     with TODO_LOCK:
         todos = load_todos()
+    if status != "all":
+        todos = [t for t in todos if t.completed == (status == "completed")]
+    if keyword := q.strip().casefold():
+        todos = [t for t in todos if keyword in t.title.casefold() or keyword in t.description.casefold()]
     if sort == "due_date":                       # 마감일 없는 항목은 맨 뒤, 같은 날짜는 등록순
         todos.sort(key=lambda t: (t.due_date is None, t.due_date or date.max, t.id))
     return todos

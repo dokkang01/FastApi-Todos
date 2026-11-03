@@ -50,7 +50,7 @@
             font-size: 1.3rem;
         }
         form#todo-form { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-        input[type="text"], input[type="date"] {
+        input[type="text"], input[type="date"], input[type="search"] {
             flex: 1 1 12rem;
             padding: .55rem .75rem;
             font-size: .95rem;
@@ -61,9 +61,9 @@
             outline: none;
             transition: border-color .15s, box-shadow .15s;
         }
-        input[type="text"]::placeholder { color: var(--text-muted); }
+        input[type="text"]::placeholder, input[type="search"]::placeholder { color: var(--text-muted); }
         input[type="date"] { flex: 0 1 10rem; font-family: inherit; }
-        input[type="text"]:focus, input[type="date"]:focus {
+        input[type="text"]:focus, input[type="date"]:focus, input[type="search"]:focus {
             border-color: var(--accent);
             box-shadow: 0 0 0 3px rgba(136, 117, 255, 0.2);
         }
@@ -141,6 +141,10 @@
             transition: width .25s;
         }
         #sort { margin-left: auto; }
+        .filters { display: flex; gap: .5rem; margin-bottom: 1rem; }
+        .filters input[type="search"] { padding: .4rem .7rem; font-size: .88rem; }
+        .empty { color: var(--text-muted); font-size: .88rem; text-align: center; padding: 1.25rem 0; }
+        .empty[hidden] { display: none; }
         select {
             font-size: .85rem;
             font-family: inherit;
@@ -199,6 +203,14 @@
             <button type="submit">Add To-Do</button>
         </form>
         <p id="error" role="alert" hidden></p>
+        <div class="filters">
+            <input type="search" id="search" placeholder="제목·설명 검색" aria-label="검색" maxlength="100">
+            <select id="status" aria-label="완료 상태">
+                <option value="all">전체</option>
+                <option value="active">진행 중</option>
+                <option value="completed">완료</option>
+            </select>
+        </div>
         <div class="toolbar">
             <div class="progress" id="progress" hidden>
                 <span class="progress-label" id="progress-label"></span>
@@ -213,6 +225,7 @@
             </select>
         </div>
         <ul id="todo-list"></ul>
+        <p class="empty" id="empty" hidden>조건에 맞는 할 일이 없습니다.</p>
     </div>
 
     <dialog id="edit-dialog">
@@ -273,9 +286,24 @@
           }
         }
 
-        const sortEl = $("sort");
-        const load = () => run("목록 불러오기", async () => render(await api(`/todos?sort=${sortEl.value}`)));
+        const sortEl = $("sort"), statusEl = $("status"), searchEl = $("search");
+
+        // 목록은 필터·검색을 적용하고, 진행률은 필터와 상관없이 전체 기준으로 계산한다
+        const load = () => run("목록 불러오기", async () => {
+          const params = new URLSearchParams({ sort: sortEl.value, status: statusEl.value, q: searchEl.value });
+          const [todos, all] = await Promise.all([api(`/todos?${params}`), api("/todos")]);
+          renderProgress(all);
+          render(todos);
+        });
         sortEl.onchange = load;
+        statusEl.onchange = load;
+
+        // 글자를 칠 때마다 요청하지 않도록 입력이 멈추고 0.25초 뒤에 불러온다
+        let searchTimer;
+        searchEl.oninput = () => {
+          clearTimeout(searchTimer);
+          searchTimer = setTimeout(load, 250);
+        };
         const save = (id, todo) => run("수정", async () => { await api(`/todos/${id}`, "PUT", todo); await load(); });
 
         function button(label, onclick, className = "") {
@@ -308,7 +336,7 @@
         }
 
         function render(todos) {
-          renderProgress(todos);
+          $("empty").hidden = todos.length > 0 || (statusEl.value === "all" && !searchEl.value.trim());
           listEl.replaceChildren(...todos.map((todo) => {
             const check = Object.assign(document.createElement("input"), {
               type: "checkbox",

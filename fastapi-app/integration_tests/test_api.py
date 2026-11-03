@@ -50,3 +50,15 @@ def test_create_without_title_returns_422():
 def test_delete_missing_id_returns_404():
     res = requests.delete(f"{BASE_URL}/todos/999999")
     assert res.status_code == 404
+
+
+def test_filter_and_search():
+    res = requests.post(f"{BASE_URL}/todos", json={"title": "통합테스트-검색", "completed": True})
+    todo_id = res.json()["id"]
+    try:
+        found = requests.get(f"{BASE_URL}/todos", params={"status": "completed", "q": "통합테스트-검색"}).json()
+        assert [t["id"] for t in found] == [todo_id]
+        active = requests.get(f"{BASE_URL}/todos", params={"status": "active", "q": "통합테스트-검색"}).json()
+        assert active == []
+    finally:
+        requests.delete(f"{BASE_URL}/todos/{todo_id}")              # 테스트 데이터 정리
