@@ -5,14 +5,14 @@ import http from "k6/http";
 import { check, group, sleep } from "k6";
 
 const BASE_URL = __ENV.BASE_URL || "http://100.82.86.31:8012";
-const MAX_VUS = Number(__ENV.MAX_VUS || 5);     // 최대 VU 수 (-e MAX_VUS=20 처럼 바꿀 수 있다)
+const MAX_VUS = Number(__ENV.MAX_VUS || 50);    // 최대 VU 수 (-e MAX_VUS=20 처럼 바꿀 수 있다)
 const JSON_HEADERS = { headers: { "Content-Type": "application/json" } };
 
 export const options = {
-  stages: [                                      // MAX_VUS까지 단계적으로 올린다 (총 약 3분)
-    { duration: "30s", target: Math.ceil(MAX_VUS / 2) },
-    { duration: "30s", target: MAX_VUS },
-    { duration: "1m30s", target: MAX_VUS },      // 최대 부하 유지
+  stages: [                                      // MAX_VUS까지 단계적으로 올린다 (총 5분)
+    { duration: "1m", target: Math.ceil(MAX_VUS / 2) },
+    { duration: "1m", target: MAX_VUS },
+    { duration: "2m30s", target: MAX_VUS },      // 최대 부하 유지
     { duration: "30s", target: 0 },              // 정리
   ],
   thresholds: {
