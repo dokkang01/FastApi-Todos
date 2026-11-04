@@ -11,6 +11,8 @@ services:
       - no-new-privileges:true    # 컨테이너 안에서 권한 상승 차단
     cap_drop:
       - ALL                       # 불필요한 커널 권한 모두 제거
+    networks:
+      - loadtest-net
   sonarqube:
     image: sonarqube:26.9.0.129388-community
     container_name: sonarqube
@@ -26,6 +28,8 @@ services:
       - sonarqube_temp:/opt/sonarqube/temp
     tmpfs:                                      # ← 추가: /tmp를 쓰기 가능하게
       - /tmp
+    networks:
+      - loadtest-net
   # services: 아래에 추가 (앞의 들여쓰기 2칸까지 그대로)
   prometheus:
     image: prom/prometheus:v3.15.0              # latest 대신 버전 고정
@@ -43,6 +47,8 @@ services:
     volumes:
       - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro   # 설정 파일은 읽기 전용(:ro)
       - prometheus-data:/prometheus           # 수집한 메트릭 저장 (컨테이너를 다시 만들어도 유지)
+    networks:
+      - loadtest-net
   
   # services: 아래에 추가 (앞의 들여쓰기 2칸까지 그대로)
   grafana:
@@ -61,6 +67,8 @@ services:
       - GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false
     volumes:
       - grafana-data:/var/lib/grafana
+    networks:
+      - loadtest-net
   
   # services: 아래에 추가 (앞의 들여쓰기 2칸까지 그대로)
   node-exporter:
@@ -72,6 +80,8 @@ services:
     cap_drop:
       - ALL
     # ports 없음: Prometheus가 내부 네트워크(node-exporter:9100)로 수집하므로 외부 공개 불필요
+    networks:
+      - loadtest-net
 
   cadvisor:
     image: ghcr.io/google/cadvisor:v0.60.6
@@ -86,6 +96,34 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
     # ports 없음: Prometheus가 cadvisor:8080으로 내부 수집
+    networks:
+      - loadtest-net
+  jmeter:
+    build:
+      context: ./jmeter
+      dockerfile: Dockerfile
+    container_name: jmeter
+    volumes:
+      - ./jmeter:/jmeter
+    command:
+      - jmeter
+      - -n
+      - -t
+      - /jmeter/fastapi_test_plan.jmx
+      - -l
+      - /jmeter/results.jtl
+      - -JTARGET_HOST=fastapi-app
+      - -JTARGET_PORT=8000
+      - -Jjmeter.save.saveservice.output_format=csv
+      - -e
+      - -o
+      - /jmeter/report
+    networks:
+      - loadtest-net
+  
+networks:
+  loadtest-net:
+    driver: bridge
 
 volumes:                                        # ← 최상위(0칸)로 이동
   sonarqube_data:
