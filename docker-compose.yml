@@ -98,11 +98,29 @@ services:
     # ports 없음: Prometheus가 cadvisor:8080으로 내부 수집
     networks:
       - loadtest-net
+
+  influxdb:
+    image: influxdb:1.11.8                      # latest 대신 버전 고정 (Grafana JMeter 대시보드가 InfluxQL 기준)
+    container_name: influxdb
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:8086:8086"                   # 서버 자신에게만 공개 (인증 미사용)
+    environment:
+      - INFLUXDB_DB=jmeter                      # 시작 시 'jmeter' DB 자동 생성
+      - INFLUXDB_HTTP_AUTH_ENABLED=false
+    volumes:
+      - influxdb-data:/var/lib/influxdb         # 테스트 결과 저장 (컨테이너를 다시 만들어도 유지)
+    networks:
+      - loadtest-net
+
   jmeter:
     build:
       context: ./jmeter
       dockerfile: Dockerfile
     container_name: jmeter
+    depends_on:
+      - influxdb
     volumes:
       - ./jmeter:/jmeter
     command:
@@ -114,6 +132,7 @@ services:
       - /jmeter/results.jtl
       - -JTARGET_HOST=fastapi-app
       - -JTARGET_PORT=8000
+      - -JINFLUX_URL=http://influxdb:8086/write?db=jmeter
       - -Jjmeter.save.saveservice.output_format=csv
       - -e
       - -o
@@ -133,3 +152,4 @@ volumes:                                        # ← 최상위(0칸)로 이동
   prometheus-data:
   grafana-data:
   cadvisor-data:
+  influxdb-data:
