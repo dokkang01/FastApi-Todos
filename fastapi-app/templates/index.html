@@ -118,6 +118,17 @@
             padding: .1rem .5rem;
             white-space: nowrap;
         }
+        .priority {
+            flex: none;
+            font-size: .72rem;
+            font-weight: 600;
+            border-radius: 4px;
+            padding: .1rem .4rem;
+            white-space: nowrap;
+        }
+        .priority.high { color: var(--danger); background: rgba(224, 108, 117, 0.15); }
+        .priority.medium { color: var(--warn); background: rgba(229, 192, 123, 0.12); }
+        .priority.low { color: var(--text-muted); background: var(--input-bg); }
         .due.soon { color: var(--warn); border-color: var(--warn); }
         .due.overdue { color: var(--danger); border-color: var(--danger); }
         .done { text-decoration: line-through; color: var(--text-muted); }
@@ -183,7 +194,7 @@
             color: var(--text-muted);
             margin: 1rem 0 .35rem;
         }
-        dialog input[type="text"], dialog input[type="date"] { width: 100%; }
+        dialog input[type="text"], dialog input[type="date"], dialog select { width: 100%; }
         .dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1.5rem; }
         .dialog-actions button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
         .dialog-actions button.secondary:hover { background: var(--hover); }
@@ -200,6 +211,11 @@
             <input type="text" id="title" placeholder="제목 (예: 20231234)" required>
             <input type="text" id="description" placeholder="설명 (예: 홍길동)">
             <input type="date" id="due-date" title="마감일">
+            <select id="priority" aria-label="우선순위">
+                <option value="high">높음</option>
+                <option value="medium" selected>보통</option>
+                <option value="low">낮음</option>
+            </select>
             <button type="submit">Add To-Do</button>
         </form>
         <p id="error" role="alert" hidden></p>
@@ -222,6 +238,7 @@
             <select id="sort" aria-label="정렬">
                 <option value="id">등록순</option>
                 <option value="due_date">마감일순</option>
+                <option value="priority">우선순위순</option>
             </select>
         </div>
         <ul id="todo-list"></ul>
@@ -237,6 +254,12 @@
             <input type="text" id="edit-description">
             <label for="edit-due-date">마감일</label>
             <input type="date" id="edit-due-date">
+            <label for="edit-priority">우선순위</label>
+            <select id="edit-priority">
+                <option value="high">높음</option>
+                <option value="medium">보통</option>
+                <option value="low">낮음</option>
+            </select>
             <div class="dialog-actions">
                 <button type="button" class="secondary" id="edit-cancel">취소</button>
                 <button type="submit" class="primary">저장</button>
@@ -324,6 +347,15 @@
           return badge;
         }
 
+        // 우선순위를 "높음/보통/낮음" 색 배지로 만든다
+        const PRIORITY_LABEL = { high: "높음", medium: "보통", low: "낮음" };
+        function priorityBadge(todo) {
+          return Object.assign(document.createElement("span"), {
+            className: `priority ${todo.priority}`,
+            textContent: PRIORITY_LABEL[todo.priority],
+          });
+        }
+
         // 목록 위에 "3/7 완료 (43%)"와 진행 막대를 표시한다 (할 일이 없으면 숨김)
         function renderProgress(todos) {
           const total = todos.length;
@@ -350,7 +382,7 @@
             const actions = Object.assign(document.createElement("div"), { className: "actions" });
             actions.append(button("Edit", () => edit(todo)), button("Delete", () => remove(todo.id), "delete"));
             const li = document.createElement("li");
-            li.append(check, text);
+            li.append(check, priorityBadge(todo), text);
             if (todo.due_date) li.append(dueBadge(todo));
             li.append(actions);
             return li;
@@ -364,6 +396,7 @@
           $("edit-title").value = todo.title;
           $("edit-description").value = todo.description;
           $("edit-due-date").value = todo.due_date ?? "";
+          $("edit-priority").value = todo.priority;
           editDialog.showModal();
         }
 
@@ -372,8 +405,9 @@
           const title = $("edit-title").value.trim();
           const description = $("edit-description").value.trim();
           const due_date = $("edit-due-date").value || null;
+          const priority = $("edit-priority").value;
           editDialog.close();
-          save(editTarget.id, { ...editTarget, title, description, due_date });
+          save(editTarget.id, { ...editTarget, title, description, due_date, priority });
         };
 
         $("edit-cancel").onclick = () => editDialog.close();
@@ -399,6 +433,7 @@
               title: $("title").value.trim(),
               description: $("description").value.trim(),
               due_date: $("due-date").value || null,
+              priority: $("priority").value,
             });
             event.target.reset();
             await load();

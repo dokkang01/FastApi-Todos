@@ -121,3 +121,41 @@ def test_get_todos_invalid_status():
 def test_get_todos_search_too_long():
     response = client.get("/todos", params={"q": "a" * 101})
     assert response.status_code == 422
+
+def test_create_todo_default_priority():
+    response = client.post("/todos", json={"title": "Test"})
+    assert response.status_code == 201
+    assert response.json()["priority"] == "medium"         # 보내지 않으면 보통
+
+def test_create_todo_with_priority():
+    response = client.post("/todos", json={"title": "Test", "priority": "high"})
+    assert response.json()["priority"] == "high"
+    assert load_todos()[0].priority == "high"
+
+def test_create_todo_invalid_priority():
+    response = client.post("/todos", json={"title": "Test", "priority": "urgent"})
+    assert response.status_code == 422
+
+def test_update_todo_priority():
+    save_todos([TodoItem(id=1, title="Test")])
+    response = client.put("/todos/1", json={"title": "Test", "priority": "low"})
+    assert response.json()["priority"] == "low"
+
+def test_get_todos_sorted_by_priority():
+    save_todos([
+        TodoItem(id=1, title="낮음", priority="low"),
+        TodoItem(id=2, title="보통"),
+        TodoItem(id=3, title="높음", priority="high"),
+        TodoItem(id=4, title="높음 나중 등록", priority="high"),
+    ])
+    response = client.get("/todos?sort=priority")
+    assert [t["id"] for t in response.json()] == [3, 4, 2, 1]  # 높음 → 보통 → 낮음, 같은 우선순위는 등록순
+
+def test_get_todos_priority_sort_with_filter():
+    save_todos([
+        TodoItem(id=1, title="A", priority="low"),
+        TodoItem(id=2, title="B", priority="high", completed=True),
+        TodoItem(id=3, title="C", priority="high"),
+    ])
+    response = client.get("/todos?status=active&sort=priority")
+    assert [t["id"] for t in response.json()] == [3, 1]

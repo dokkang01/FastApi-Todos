@@ -29,6 +29,10 @@ class TodoIn(BaseModel):                         # 클라이언트가 보내는 
     description: str = ""
     completed: bool = False
     due_date: date | None = None                 # 마감일 (없어도 된다)
+    priority: Literal["high", "medium", "low"] = "medium"   # 우선순위 (기존 데이터는 보통으로 읽힌다)
+
+
+PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}   # 우선순위 정렬 순서
 
 
 class TodoItem(TodoIn):                          # 서버가 돌려주는 데이터 (id 있음)
@@ -52,9 +56,9 @@ def find_index(todos: list[TodoItem], todo_id: int) -> int:
     raise HTTPException(404, "To-Do item not found")
 
 
-@app.get("/todos")                               # 목록 조회 — ?sort=due_date 면 마감일 빠른 순
+@app.get("/todos")                               # 목록 조회 — ?sort=due_date 마감일 빠른 순, ?sort=priority 우선순위 높은 순
 def get_todos(
-    sort: Literal["id", "due_date"] = "id",
+    sort: Literal["id", "due_date", "priority"] = "id",
     status: Literal["all", "active", "completed"] = "all",   # active = 진행 중, completed = 완료
     q: str = Query("", max_length=100),                       # 제목·설명 검색어 (대소문자 무시)
 ) -> list[TodoItem]:
@@ -66,6 +70,8 @@ def get_todos(
         todos = [t for t in todos if keyword in t.title.casefold() or keyword in t.description.casefold()]
     if sort == "due_date":                       # 마감일 없는 항목은 맨 뒤, 같은 날짜는 등록순
         todos.sort(key=lambda t: (t.due_date is None, t.due_date or date.max, t.id))
+    elif sort == "priority":                     # 높음 → 보통 → 낮음, 같은 우선순위는 등록순
+        todos.sort(key=lambda t: (PRIORITY_RANK[t.priority], t.id))
     return todos
 
 

@@ -62,3 +62,14 @@ def test_filter_and_search():
         assert active == []
     finally:
         requests.delete(f"{BASE_URL}/todos/{todo_id}")              # 테스트 데이터 정리
+
+
+def test_priority_sort():
+    low = requests.post(f"{BASE_URL}/todos", json={"title": "통합테스트-우선순위", "priority": "low"}).json()
+    high = requests.post(f"{BASE_URL}/todos", json={"title": "통합테스트-우선순위", "priority": "high"}).json()
+    try:
+        found = requests.get(f"{BASE_URL}/todos", params={"sort": "priority", "q": "통합테스트-우선순위"}).json()
+        assert [t["id"] for t in found] == [high["id"], low["id"]]
+    finally:
+        for todo in (low, high):
+            requests.delete(f"{BASE_URL}/todos/{todo['id']}")       # 테스트 데이터 정리
