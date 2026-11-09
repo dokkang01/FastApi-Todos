@@ -122,10 +122,13 @@ services:
     depends_on:
       - influxdb
     volumes:
-      - ./jmeter:/jmeter
+      # 폴더 전체 대신 테스트 계획만 읽기 전용 마운트 → /jmeter 는 이미지의 jmeter(uid 1000) 소유로 남아 쓰기 가능
+      # 결과 파일: docker cp jmeter:/jmeter/report ./jmeter/report
+      - ./jmeter/fastapi_test_plan.jmx:/jmeter/fastapi_test_plan.jmx:ro
     command:
       - jmeter
       - -n
+      - -f                                      # 이전 results.jtl / report 폴더를 지우고 다시 생성
       - -t
       - /jmeter/fastapi_test_plan.jmx
       - -l
