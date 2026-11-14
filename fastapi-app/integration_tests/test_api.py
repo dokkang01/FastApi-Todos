@@ -73,3 +73,15 @@ def test_priority_sort():
     finally:
         for todo in (low, high):
             requests.delete(f"{BASE_URL}/todos/{todo['id']}")       # 테스트 데이터 정리
+
+
+def test_kanban_stage_move():
+    todo = requests.post(f"{BASE_URL}/todos", json={"title": "통합테스트-칸반"}).json()
+    try:
+        assert todo["stage"] == "todo"
+        res = requests.put(f"{BASE_URL}/todos/{todo['id']}", json={"title": "통합테스트-칸반", "stage": "doing"})
+        assert (res.json()["stage"], res.json()["completed"]) == ("doing", False)
+        res = requests.put(f"{BASE_URL}/todos/{todo['id']}", json={"title": "통합테스트-칸반", "stage": "done"})
+        assert (res.json()["stage"], res.json()["completed"]) == ("done", True)
+    finally:
+        requests.delete(f"{BASE_URL}/todos/{todo['id']}")           # 테스트 데이터 정리

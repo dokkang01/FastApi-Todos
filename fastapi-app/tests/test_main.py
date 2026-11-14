@@ -159,3 +159,46 @@ def test_get_todos_priority_sort_with_filter():
     ])
     response = client.get("/todos?status=active&sort=priority")
     assert [t["id"] for t in response.json()] == [3, 1]
+
+def test_create_todo_default_stage():
+    response = client.post("/todos", json={"title": "Test"})
+    assert response.json()["stage"] == "todo"              # 새 할 일은 '할 일' 칸에서 시작
+    assert response.json()["completed"] is False
+
+def test_create_todo_with_stage():
+    response = client.post("/todos", json={"title": "Test", "stage": "doing"})
+    assert response.status_code == 201
+    assert response.json()["stage"] == "doing"
+    assert load_todos()[0].stage == "doing"
+
+def test_create_todo_invalid_stage():
+    response = client.post("/todos", json={"title": "Test", "stage": "blocked"})
+    assert response.status_code == 422
+
+def test_move_todo_between_stages():
+    save_todos([TodoItem(id=1, title="Test")])
+    doing = client.put("/todos/1", json={"title": "Test", "stage": "doing"}).json()
+    assert (doing["stage"], doing["completed"]) == ("doing", False)
+    done = client.put("/todos/1", json={"title": "Test", "stage": "done"}).json()
+    assert (done["stage"], done["completed"]) == ("done", True)  # 완료 칸으로 옮기면 완료 처리
+
+def test_stage_wins_over_completed():
+    response = client.post("/todos", json={"title": "Test", "stage": "doing", "completed": True})
+    assert (response.json()["stage"], response.json()["completed"]) == ("doing", False)
+
+def test_completed_only_request_sets_stage():
+    save_todos([TodoItem(id=1, title="Test", stage="doing")])
+    response = client.put("/todos/1", json={"title": "Test", "completed": True})  # stage 를 모르는 기존 클라이언트
+    assert (response.json()["stage"], response.json()["completed"]) == ("done", True)
+
+def test_legacy_data_without_stage():
+    main.TODO_FILE.write_text(
+        '[{"id": 1, "title": "A", "completed": true}, {"id": 2, "title": "B", "completed": false}]',
+        encoding="utf-8",
+    )
+    assert [t["stage"] for t in client.get("/todos").json()] == ["done", "todo"]  # 기존 todo.json 도 그대로 읽힌다
+
+def test_status_filter_with_stages():
+    save_todos([TodoItem(id=1, title="A"), TodoItem(id=2, title="B", stage="doing"), TodoItem(id=3, title="C", stage="done")])
+    assert [t["id"] for t in client.get("/todos?status=active").json()] == [1, 2]  # 미완료 = 할 일 + 진행 중
+    assert [t["id"] for t in client.get("/todos?status=completed").json()] == [3]

@@ -10,7 +10,7 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from prometheus_fastapi_instrumentator import Instrumentator  # ← 추가
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 BASE_DIR = Path(__file__).resolve().parent       # main.py 가 있는 폴더
@@ -57,6 +57,16 @@ class TodoIn(BaseModel):                         # 클라이언트가 보내는 
     completed: bool = False
     due_date: date | None = None                 # 마감일 (없어도 된다)
     priority: Literal["high", "medium", "low"] = "medium"   # 우선순위 (기존 데이터는 보통으로 읽힌다)
+    stage: Literal["todo", "doing", "done"] = "todo"        # 칸반 단계: 할 일 → 진행 중 → 완료
+
+    @model_validator(mode="after")
+    def sync_stage_and_completed(self):
+        # stage 와 completed 가 항상 같은 뜻이 되게 맞춘다 (done ⇔ completed=True)
+        # stage 를 안 보낸 요청·기존 데이터는 completed 로 정하고, 보냈으면 stage 가 우선한다
+        if "stage" not in self.model_fields_set:
+            self.stage = "done" if self.completed else "todo"
+        self.completed = self.stage == "done"
+        return self
 
 
 PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}   # 우선순위 정렬 순서

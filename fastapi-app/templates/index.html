@@ -30,6 +30,7 @@
         .card {
             max-width: 640px;
             margin: 0 auto;
+            transition: max-width .2s;
             background: var(--card);
             border: 1px solid var(--border);
             border-radius: 10px;
@@ -202,10 +203,93 @@
         .dialog-actions button.primary:hover { background: #9c8bff; }
         .dialog-actions button.danger { background: var(--danger); color: #fff; }
         .dialog-actions button.danger:hover { background: #e88088; }
+        .stage {
+            flex: none;
+            font-size: .72rem;
+            font-weight: 600;
+            color: var(--accent);
+            background: rgba(136, 117, 255, 0.15);
+            border-radius: 4px;
+            padding: .1rem .4rem;
+            white-space: nowrap;
+        }
+        /* 리스트 / 보드 보기 전환 */
+        .view-toggle { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; flex: none; }
+        .view-toggle button { background: transparent; color: var(--text-muted); border-radius: 0; padding: .4rem .75rem; font-size: .85rem; }
+        .view-toggle button:hover { background: var(--hover); color: var(--text); }
+        .view-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+        select[hidden], ul[hidden], .board[hidden] { display: none; }
+        /* 칸반 보드 */
+        .card.wide { max-width: 1040px; }
+        .board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .9rem; }
+        .kanban-col {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: .75rem;
+            min-height: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: .5rem;
+            transition: border-color .12s, background .12s;
+        }
+        .kanban-col.over { border-color: var(--accent); background: rgba(136, 117, 255, 0.07); }
+        .kanban-col h2 {
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            margin: 0 0 .25rem;
+            font-size: .9rem;
+            font-weight: 600;
+        }
+        .kanban-col h2::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+        .kanban-col[data-stage="doing"] h2::before { background: var(--accent); }
+        .kanban-col[data-stage="done"] h2::before { background: #98c379; }
+        .kanban-col .count { color: var(--text-muted); font-weight: 400; font-size: .8rem; }
+        .kanban-empty {
+            color: var(--text-muted);
+            font-size: .8rem;
+            text-align: center;
+            border: 1px dashed var(--border);
+            border-radius: 6px;
+            padding: 1rem .5rem;
+            margin: 0;
+        }
+        .kanban-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: .6rem .7rem;
+            cursor: grab;
+            transition: border-color .12s, opacity .12s;
+        }
+        .kanban-card:hover { border-color: #4a4a4a; }
+        .kanban-card.dragging { opacity: .4; }
+        .kanban-card .title { font-size: .92rem; word-break: break-word; }
+        .kanban-card .desc { margin: .25rem 0 0; font-size: .8rem; color: var(--text-muted); word-break: break-word; }
+        .kanban-card .meta { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
+        .kanban-card .actions { display: flex; gap: .2rem; margin-left: auto; opacity: 0; transition: opacity .12s; }
+        .kanban-card:hover .actions, .kanban-card:focus-within .actions { opacity: 1; }
+        .kanban-card .actions button {
+            background: transparent;
+            color: var(--text-muted);
+            padding: .2rem .4rem;
+            font-size: .75rem;
+        }
+        .kanban-card .actions button:hover { background: var(--border); color: var(--text); }
+        .kanban-card .actions button.delete:hover { color: var(--danger); }
+        li:focus-within .actions { opacity: 1; }
+        @media (hover: none) {                       /* 터치 기기는 hover 가 없으니 버튼을 항상 보인다 */
+            li .actions, .kanban-card .actions { opacity: 1; }
+        }
+        @media (max-width: 720px) {
+            .board { grid-template-columns: 1fr; }
+            .kanban-col { min-height: 0; }
+        }
     </style>
 </head>
 <body>
-    <div class="card">
+    <div class="card" id="card">
         <h1>To-Do List</h1>
         <form id="todo-form">
             <input type="text" id="title" placeholder="제목 (예: 20231234)" required>
@@ -223,9 +307,13 @@
             <input type="search" id="search" placeholder="제목·설명 검색" aria-label="검색" maxlength="100">
             <select id="status" aria-label="완료 상태">
                 <option value="all">전체</option>
-                <option value="active">진행 중</option>
+                <option value="active">미완료</option>
                 <option value="completed">완료</option>
             </select>
+            <div class="view-toggle" role="group" aria-label="보기 방식">
+                <button type="button" id="view-list" aria-pressed="true">리스트</button>
+                <button type="button" id="view-board" aria-pressed="false">보드</button>
+            </div>
         </div>
         <div class="toolbar">
             <div class="progress" id="progress" hidden>
@@ -242,6 +330,7 @@
             </select>
         </div>
         <ul id="todo-list"></ul>
+        <div class="board" id="board" hidden></div>
         <p class="empty" id="empty" hidden>조건에 맞는 할 일이 없습니다.</p>
     </div>
 
@@ -259,6 +348,12 @@
                 <option value="high">높음</option>
                 <option value="medium">보통</option>
                 <option value="low">낮음</option>
+            </select>
+            <label for="edit-stage">상태</label>
+            <select id="edit-stage">
+                <option value="todo">할 일</option>
+                <option value="doing">진행 중</option>
+                <option value="done">완료</option>
             </select>
             <div class="dialog-actions">
                 <button type="button" class="secondary" id="edit-cancel">취소</button>
@@ -309,14 +404,34 @@
           }
         }
 
-        const sortEl = $("sort"), statusEl = $("status"), searchEl = $("search");
+        const sortEl = $("sort"), statusEl = $("status"), searchEl = $("search"), boardEl = $("board");
+
+        // 보기 방식(리스트/보드)은 이 브라우저에 기억해 둔다 (저장소를 못 쓰면 리스트로 시작)
+        let view = "list";
+        try { if (localStorage.getItem("todo-view") === "board") view = "board"; } catch {}
+
+        function setView(next) {
+          view = next;
+          try { localStorage.setItem("todo-view", next); } catch {}
+          const board = view === "board";
+          $("view-list").setAttribute("aria-pressed", String(!board));
+          $("view-board").setAttribute("aria-pressed", String(board));
+          $("card").classList.toggle("wide", board);
+          statusEl.hidden = board;                   // 보드는 칸 자체가 상태라서 완료 필터가 필요 없다
+          listEl.hidden = board;
+          boardEl.hidden = !board;
+        }
+        $("view-list").onclick = () => { setView("list"); load(); };
+        $("view-board").onclick = () => { setView("board"); load(); };
 
         // 목록은 필터·검색을 적용하고, 진행률은 필터와 상관없이 전체 기준으로 계산한다
         const load = () => run("목록 불러오기", async () => {
-          const params = new URLSearchParams({ sort: sortEl.value, status: statusEl.value, q: searchEl.value });
+          const status = view === "board" ? "all" : statusEl.value;
+          const params = new URLSearchParams({ sort: sortEl.value, status, q: searchEl.value });
           const [todos, all] = await Promise.all([api(`/todos?${params}`), api("/todos")]);
           renderProgress(all);
-          render(todos);
+          if (view === "board") renderBoard(todos);
+          else render(todos);
         });
         sortEl.onchange = load;
         statusEl.onchange = load;
@@ -328,6 +443,7 @@
           searchTimer = setTimeout(load, 250);
         };
         const save = (id, todo) => run("수정", async () => { await api(`/todos/${id}`, "PUT", todo); await load(); });
+        const moveTo = (todo, stage) => save(todo.id, { ...todo, stage });   // 칸 이동 = stage 만 바꿔 저장
 
         function button(label, onclick, className = "") {
           return Object.assign(document.createElement("button"), { textContent: label, onclick, className });
@@ -367,13 +483,78 @@
           $("progress-bar").setAttribute("aria-valuenow", percent);
         }
 
+        const STAGES = [
+          { key: "todo", label: "할 일" },
+          { key: "doing", label: "진행 중" },
+          { key: "done", label: "완료" },
+        ];
+
+        // 칸반 카드 한 장: 끌어서 다른 칸에 놓거나, ◀ ▶ 버튼으로 옆 칸으로 옮긴다 (터치·키보드용)
+        function boardCard(todo, index) {
+          const card = Object.assign(document.createElement("article"), {
+            className: "kanban-card",
+            draggable: true,
+            ondragstart: (event) => {
+              event.dataTransfer.setData("text/plain", String(todo.id));
+              event.dataTransfer.effectAllowed = "move";
+              card.classList.add("dragging");
+            },
+            ondragend: () => card.classList.remove("dragging"),
+          });
+          const title = Object.assign(document.createElement("div"), {
+            className: todo.completed ? "title done" : "title",
+            textContent: todo.title,
+          });
+          card.append(title);
+          if (todo.description) {
+            card.append(Object.assign(document.createElement("p"), { className: "desc", textContent: todo.description }));
+          }
+          const actions = Object.assign(document.createElement("div"), { className: "actions" });
+          const prev = STAGES[index - 1], next = STAGES[index + 1];
+          if (prev) actions.append(Object.assign(button("◀", () => moveTo(todo, prev.key)), { title: `${prev.label}(으)로 이동` }));
+          if (next) actions.append(Object.assign(button("▶", () => moveTo(todo, next.key)), { title: `${next.label}(으)로 이동` }));
+          actions.append(button("Edit", () => edit(todo)), button("Delete", () => remove(todo.id), "delete"));
+          const meta = Object.assign(document.createElement("div"), { className: "meta" });
+          meta.append(priorityBadge(todo));
+          if (todo.due_date) meta.append(dueBadge(todo));
+          meta.append(actions);
+          card.append(meta);
+          return card;
+        }
+
+        // 할 일 / 진행 중 / 완료 세 칸을 그린다. 칸 안의 순서는 위의 정렬 선택을 따른다
+        function renderBoard(todos) {
+          $("empty").hidden = true;
+          boardEl.replaceChildren(...STAGES.map(({ key, label }, index) => {
+            const items = todos.filter((todo) => todo.stage === key);
+            const col = document.createElement("section");
+            col.className = "kanban-col";
+            col.dataset.stage = key;
+            const heading = Object.assign(document.createElement("h2"), { textContent: label });
+            heading.append(Object.assign(document.createElement("span"), { className: "count", textContent: items.length }));
+            col.append(heading, ...items.map((todo) => boardCard(todo, index)));
+            if (items.length === 0) {
+              col.append(Object.assign(document.createElement("p"), { className: "kanban-empty", textContent: "여기로 끌어다 놓기" }));
+            }
+            col.ondragover = (event) => { event.preventDefault(); col.classList.add("over"); };
+            col.ondragleave = (event) => { if (!col.contains(event.relatedTarget)) col.classList.remove("over"); };
+            col.ondrop = (event) => {
+              event.preventDefault();
+              col.classList.remove("over");
+              const todo = todos.find((t) => t.id === Number(event.dataTransfer.getData("text/plain")));
+              if (todo && todo.stage !== key) moveTo(todo, key);
+            };
+            return col;
+          }));
+        }
+
         function render(todos) {
           $("empty").hidden = todos.length > 0 || (statusEl.value === "all" && !searchEl.value.trim());
           listEl.replaceChildren(...todos.map((todo) => {
             const check = Object.assign(document.createElement("input"), {
               type: "checkbox",
               checked: todo.completed,
-              onchange: () => save(todo.id, { ...todo, completed: check.checked }),
+              onchange: () => moveTo(todo, check.checked ? "done" : "todo"),   // 체크 = 완료 칸, 해제 = 할 일 칸
             });
             const text = Object.assign(document.createElement("span"), {
               textContent: `${todo.title} — ${todo.description}`,
@@ -382,7 +563,9 @@
             const actions = Object.assign(document.createElement("div"), { className: "actions" });
             actions.append(button("Edit", () => edit(todo)), button("Delete", () => remove(todo.id), "delete"));
             const li = document.createElement("li");
-            li.append(check, priorityBadge(todo), text);
+            li.append(check, priorityBadge(todo));
+            if (todo.stage === "doing") li.append(Object.assign(document.createElement("span"), { className: "stage", textContent: "진행 중" }));
+            li.append(text);
             if (todo.due_date) li.append(dueBadge(todo));
             li.append(actions);
             return li;
@@ -397,6 +580,7 @@
           $("edit-description").value = todo.description;
           $("edit-due-date").value = todo.due_date ?? "";
           $("edit-priority").value = todo.priority;
+          $("edit-stage").value = todo.stage;
           editDialog.showModal();
         }
 
@@ -406,8 +590,9 @@
           const description = $("edit-description").value.trim();
           const due_date = $("edit-due-date").value || null;
           const priority = $("edit-priority").value;
+          const stage = $("edit-stage").value;
           editDialog.close();
-          save(editTarget.id, { ...editTarget, title, description, due_date, priority });
+          save(editTarget.id, { ...editTarget, title, description, due_date, priority, stage });
         };
 
         $("edit-cancel").onclick = () => editDialog.close();
@@ -440,6 +625,7 @@
           });
         };
 
+        setView(view);
         load();
     </script>
 </body>
